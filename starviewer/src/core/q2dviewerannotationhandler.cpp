@@ -358,6 +358,15 @@ void Q2DViewerAnnotationHandler::updatePatientInformationAnnotation()
 
 void Q2DViewerAnnotationHandler::updateVoiLutInformationAnnotation()
 {
+    MammographyImageHelper mammographyImageHelper;
+    Image *image = m_2DViewer->getCurrentDisplayedImage();
+
+    // Disable the VOI LUT annotation when displaying a mammography
+    if (mammographyImageHelper.isStandardMammographyImage(image))
+    {
+        m_enabledAnnotations &= ~VoiLutInformationAnnotation;
+    }
+
     if (m_enabledAnnotations.testFlag(VoiLutInformationAnnotation))
     {
         int dimensions[3];
