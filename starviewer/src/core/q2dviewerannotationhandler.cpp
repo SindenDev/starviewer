@@ -141,8 +141,8 @@ void Q2DViewerAnnotationHandler::updatePatientAnnotationInformation()
 
         if (m_enabledAnnotations.testFlag(PatientInformationAnnotation))
         {
-            m_cornerAnnotations->SetText(UpperRightCornerIndex, m_upperRightText.toUtf8().constData());
-            m_cornerAnnotations->SetText(LowerRightCornerIndex, m_lowerRightText.trimmed().toUtf8().constData());
+            setCornerAnnotation(UpperRightCornerIndex, m_upperRightText);
+            setCornerAnnotation(LowerRightCornerIndex, m_lowerRightText.trimmed());
         }
     }
     else
@@ -169,7 +169,7 @@ void Q2DViewerAnnotationHandler::updateSliceAnnotationInformation()
 
         m_lowerRightText = laterality + " " + projection;
         
-        m_cornerAnnotations->SetText(LowerRightCornerIndex, m_lowerRightText.trimmed().toUtf8().constData());
+        setCornerAnnotation(LowerRightCornerIndex, m_lowerRightText.trimmed());
     }
     else
     {
@@ -202,6 +202,8 @@ void Q2DViewerAnnotationHandler::updatePatientOrientationAnnotation()
     {
         m_patientOrientationText[LeftOrientationLabelIndex].remove(PatientOrientation::PosteriorLabel);
         m_patientOrientationText[RightOrientationLabelIndex].remove(PatientOrientation::PosteriorLabel);
+        // HACK: If the orientation has changed we may need to swap sides of annotations in mammography, and this is the easiest way to ensure it right now
+        refreshAnnotations();
     }
     
     bool textActorShouldBeVisible = m_enabledAnnotations.testFlag(PatientOrientationAnnotation);
@@ -229,13 +231,13 @@ void Q2DViewerAnnotationHandler::refreshAnnotations()
 
     if (m_enabledAnnotations.testFlag(PatientInformationAnnotation))
     {
-        m_cornerAnnotations->SetText(UpperRightCornerIndex, m_upperRightText.toUtf8().constData());
-        m_cornerAnnotations->SetText(LowerRightCornerIndex, m_lowerRightText.trimmed().toUtf8().constData());
+        setCornerAnnotation(UpperRightCornerIndex, m_upperRightText);
+        setCornerAnnotation(LowerRightCornerIndex, m_lowerRightText.trimmed());
     }
     else
     {
-        m_cornerAnnotations->SetText(UpperRightCornerIndex, " ");
-        m_cornerAnnotations->SetText(LowerRightCornerIndex, " ");
+        setCornerAnnotation(UpperRightCornerIndex, " ");
+        setCornerAnnotation(LowerRightCornerIndex, " ");
     }
 
     if (m_enabledAnnotations.testFlag(PatientOrientationAnnotation))
@@ -295,11 +297,11 @@ void Q2DViewerAnnotationHandler::updateSliceAnnotation()
             lowerLeftText += QObject::tr(" Thickness: %1 mm").arg(m_2DViewer->getCurrentSliceThickness(), 0, 'f', 2);
         }
 
-        m_cornerAnnotations->SetText(LowerLeftCornerIndex, lowerLeftText.toUtf8().constData());
+        setCornerAnnotation(LowerLeftCornerIndex, lowerLeftText);
     }
     else
     {
-        m_cornerAnnotations->SetText(LowerLeftCornerIndex, " ");
+        setCornerAnnotation(LowerLeftCornerIndex, " ");
     }
 }
 
@@ -312,16 +314,16 @@ void Q2DViewerAnnotationHandler::updateLateralityAnnotationInformation()
             
         if (m_lowerRightText.trimmed().isEmpty())
         {
-            m_cornerAnnotations->SetText(LowerRightCornerIndex, lateralityAnnotation.toUtf8().constData());
+            setCornerAnnotation(LowerRightCornerIndex, lateralityAnnotation);
         }
         else
         {
-            m_cornerAnnotations->SetText(LowerRightCornerIndex, (lateralityAnnotation + "\n" + m_lowerRightText.trimmed()).toUtf8().constData());
+            setCornerAnnotation(LowerRightCornerIndex, (lateralityAnnotation + "\n" + m_lowerRightText.trimmed()));
         }
     }
     else
     {
-        m_cornerAnnotations->SetText(LowerRightCornerIndex, m_lowerRightText.trimmed().toUtf8().constData());
+        setCornerAnnotation(LowerRightCornerIndex, m_lowerRightText.trimmed());
     }
 }
 
@@ -340,16 +342,16 @@ void Q2DViewerAnnotationHandler::updatePatientInformationAnnotation()
                 {
                     imageTime = "--:--";
                 }
-                m_cornerAnnotations->SetText(UpperRightCornerIndex, (m_upperRightText + imageTime).toUtf8().constData());
+                setCornerAnnotation(UpperRightCornerIndex, (m_upperRightText + imageTime));
             }
             else
             {
-                m_cornerAnnotations->SetText(UpperRightCornerIndex, m_upperRightText.toUtf8().constData());
+                setCornerAnnotation(UpperRightCornerIndex, m_upperRightText);
             }
         }
         else
         {
-            m_cornerAnnotations->SetText(UpperRightCornerIndex, m_upperRightText.toUtf8().constData());
+            setCornerAnnotation(UpperRightCornerIndex, m_upperRightText);
         }
     }
 }
@@ -371,7 +373,7 @@ void Q2DViewerAnnotationHandler::updateVoiLutInformationAnnotation()
         m_upperLeftText = " ";
     }
     
-    m_cornerAnnotations->SetText(UpperLeftCornerIndex, m_upperLeftText.toUtf8().constData());
+    setCornerAnnotation(UpperLeftCornerIndex, m_upperLeftText);
 }
 
 QString Q2DViewerAnnotationHandler::getSliceLocationAnnotation()
@@ -517,6 +519,27 @@ QString Q2DViewerAnnotationHandler::getVoiLutString() const
     }
 
     return lutPart + windowLevelPart + thresholdPart;
+}
+
+void Q2DViewerAnnotationHandler::setCornerAnnotation(CornerAnnotationIndexType corner, const QString &text)
+{
+    MammographyImageHelper mammographyImageHelper;
+    Image *image = m_2DViewer->getCurrentDisplayedImage();
+
+    // If displaying a mammography and the posterior side is at the right, then swap annotation sides so that patient information doesn't cover the image
+    if (mammographyImageHelper.isStandardMammographyImage(image) &&
+            m_2DViewer->getCurrentDisplayedImagePatientOrientation().getRowDirectionLabel() == PatientOrientation::PosteriorLabel)
+    {
+        switch (corner)
+        {
+            case LowerLeftCornerIndex: corner = LowerRightCornerIndex; break;
+            case LowerRightCornerIndex: corner = LowerLeftCornerIndex; break;
+            case UpperLeftCornerIndex: corner = UpperRightCornerIndex; break;
+            case UpperRightCornerIndex: corner = UpperLeftCornerIndex; break;
+        }
+    }
+
+    m_cornerAnnotations->SetText(corner, text.toUtf8().constData());
 }
 
 } // End namespace udg

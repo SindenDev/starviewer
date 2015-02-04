@@ -51,6 +51,11 @@ public:
     void updatePatientOrientationAnnotation();
 
 private:
+    /// Enumerated values to distinguish the corresponding index of each annotation
+    enum CornerAnnotationIndexType { LowerLeftCornerIndex = 0, LowerRightCornerIndex = 1, UpperLeftCornerIndex = 2, UpperRightCornerIndex = 3 };
+    enum OrienationLabelIndexType { LeftOrientationLabelIndex = 0, BottomOrientationLabelIndex = 1, RightOrientationLabelIndex = 2, TopOrientationLabelIndex = 3 };
+
+private:
     /// Refreshes the visibility of the annotations regarding the enabled flags
     void refreshAnnotations();
     
@@ -79,6 +84,10 @@ private:
     /// Returns the current VOI LUT string.
     QString getVoiLutString() const;
 
+    /// Sets the given text to the specified corner.
+    /// The actual corner where the text is put may be different though, depending on some conditions (e.g. mammography).
+    void setCornerAnnotation(CornerAnnotationIndexType corner, const QString &text);
+
 private:
     /// Viewer we are handling
     Q2DViewer *m_2DViewer;
@@ -98,10 +107,6 @@ private:
     /// Image orientation text actors
     vtkTextActor *m_patientOrientationTextActor[4];
 
-    /// Enumerated values to distinguish the corresponding index of each annotation
-    enum CornerAnnotationIndexType { LowerLeftCornerIndex = 0, LowerRightCornerIndex = 1, UpperLeftCornerIndex = 2, UpperRightCornerIndex = 3 };
-    enum OrienationLabelIndexType { LeftOrientationLabelIndex = 0, BottomOrientationLabelIndex = 1, RightOrientationLabelIndex = 2, TopOrientationLabelIndex = 3 }; 
-    
     /// Flags to keep which annotations are enabled
     AnnotationFlags m_enabledAnnotations;
 };
